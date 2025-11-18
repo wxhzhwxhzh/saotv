@@ -494,6 +494,7 @@
           <div class="video-status">
             <span class="status-dot" id="status-dot"></span>
             <span id="status-text">等待播放</span>
+            <span id="status-name">...</span>
           </div>
           <div id="current-url" style="font-size: 12px; color: var(--text-secondary); max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></div>
         </div>
@@ -513,30 +514,10 @@
 
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script src="./main.js" ></script>
   <script>
     let currentHls = null;
 
-    // 推荐频道数据
-    const channels = {
-      "channels": [
-        {
-          "name": "BBC新闻",
-          "url": "https://cdn4.skygo.mn/live/disk1/BBC_News/HLSv3-FTA/BBC_News.m3u8"
-        },
-        {
-          "name": "BBC世界(欧洲)",
-          "url": "https://viamotionhsi.netplus.ch/live/eds/bbcworld/browser-HLS8/bbcworld.m3u8"
-        },
-        {
-          "name": "BBC新闻(北美)",
-          "url": "https://fl1.moveonjoy.com/BBC_WORLD_NEWS/index.m3u8"
-        },
-        {
-          "name": "中国国际TV",
-          "url": "https://amg00405-rakutentv-cgtn-rakuten-i9tar.amagi.tv/master.m3u8"
-        }
-      ]
-    };
 
     // 初始化频道列表
     function initChannels() {
@@ -633,6 +614,7 @@
     // 更新状态
     function updateStatus(status, isActive = false) {
       $('#status-text').text(status);
+      
       if (isActive) {
         $('#status-dot').addClass('active');
       } else {
@@ -658,6 +640,8 @@
 
       updateStatus('正在加载...', false);
       $('#current-url').text(videoUrl);
+      let name=findNameByUrl(videoUrl)
+      $('#status-name').text(name);
 
       // 如果浏览器支持 HLS.js
       if (Hls.isSupported()) {
@@ -674,7 +658,7 @@
         currentHls.on(Hls.Events.ERROR, function (event, data) {
           console.error('加载流媒体时发生错误：', data);
           updateStatus('加载失败', false);
-          alert('加载流媒体时发生错误，请检查链接或网络连接。');
+          new_alert('加载流媒体时发生错误，请检查链接或网络连接。');
         });
       } else if ($videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
         $videoPlayer.src = videoUrl;
