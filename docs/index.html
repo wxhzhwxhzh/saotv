@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SaoTV 互联网在线TV</title>
+  <link rel="icon" href="../fav.png">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- jQuery -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  
+  <!-- HLS.js -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  
+  <style>
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .animate-pulse-dot {
+      animation: pulse 2s infinite;
+    }
+  </style>
+  
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: '#3498db',
+            danger: '#e74c3c',
+            success: '#27ae60',
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen transition-colors duration-300">
+
+  <!-- 导航栏 -->
+  <nav class="fixed top-0 left-0 right-0 bg-white dark:bg-gray-800 border-b-2 border-gray-200 dark:border-gray-700 shadow-lg z-50 h-16">
+    <div class="flex justify-between items-center h-full px-4 lg:px-6">
+      <div class="flex items-center gap-3 text-xl font-bold">
+        <i class="fas fa-tv text-primary"></i>
+        <span>SaoTV-互联网在线TV</span>
+      </div>
+      
+      <div class="flex items-center gap-3">
+        <a href="https://iptv-org.github.io/" target="_blank" 
+           class="hidden sm:block text-primary hover:text-blue-600 font-medium px-3 py-2 rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700 transition-all">
+          <i class="fas fa-link mr-1"></i> IPTV资源
+        </a>
+        
+        <button id="theme-toggle" 
+                class="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 rounded-full hover:scale-105 transition-transform">
+          <i id="theme-icon" class="fas fa-sun text-lg"></i>
+        </button>
+        
+        <button id="menu-toggle" 
+                class="lg:hidden flex items-center justify-center w-11 h-11 border-2 border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+          <i class="fas fa-bars text-xl"></i>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 遮罩层 (移动端) -->
+  <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden opacity-0 transition-opacity duration-300"></div>
+
+  <!-- 主容器 -->
+  <div class="flex pt-16 h-screen">
+    
+    <!-- 侧边栏 -->
+    <aside id="sidebar" 
+           class="fixed lg:static top-16 left-0 bottom-0 w-72 bg-gray-50 dark:bg-gray-800 border-r-2 border-gray-200 dark:border-gray-700 overflow-y-auto shadow-xl z-40 transform -translate-x-full lg:translate-x-0 transition-transform duration-300">
+      <div class="p-5">
+        <div class="flex items-center gap-3 text-xl font-semibold mb-5">
+          <i class="fas fa-tv text-primary"></i>
+          <span>推荐频道</span>
+        </div>
+        
+        <ul id="channel-list" class="space-y-2"></ul>
+      </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="flex-1 overflow-y-auto p-4 lg:p-6">
+      <div class="max-w-6xl mx-auto">
+        
+        <!-- 卡片容器 -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 lg:p-8">
+          
+          <!-- 标题 -->
+          <div class="flex justify-between items-center mb-6 flex-wrap gap-4">
+            <h1 class="text-3xl font-bold flex items-center gap-3">
+              <i class="fas fa-film text-primary"></i>
+              <span>流媒体播放器</span>
+            </h1>
+          </div>
+
+          <!-- 输入区域 -->
+          <div class="mb-6">
+            <input type="text" 
+                   id="m3u8-url" 
+                   placeholder="请输入 .m3u8 或视频链接" 
+                   class="w-full px-4 py-3 mb-3 text-base border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-20 transition-all">
+            
+            <div class="flex flex-col sm:flex-row gap-3">
+              <button id="play-btn" 
+                      class="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-primary hover:bg-blue-600 text-white font-semibold rounded-lg hover:-translate-y-0.5 hover:shadow-lg transition-all">
+                <i class="fas fa-play"></i>
+                <span>播放</span>
+              </button>
+              
+              <button id="clear-btn" 
+                      class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-danger hover:bg-red-600 text-white font-semibold rounded-lg hover:-translate-y-0.5 hover:shadow-lg transition-all">
+                <i class="fas fa-trash"></i>
+                <span>清空</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 视频播放器 -->
+          <div class="rounded-xl overflow-hidden bg-black mb-4">
+            <video id="video-player" 
+                   controls 
+                   class="w-full h-auto">
+              <source id="video-source" type="application/x-mpegURL">
+              您的浏览器不支持视频播放。
+            </video>
+          </div>
+
+          <!-- 视频信息 -->
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 mb-8">
+            <div class="flex items-center gap-2 text-sm">
+              <span id="status-dot" class="w-2 h-2 rounded-full bg-gray-400"></span>
+              <span id="status-text" class="text-gray-600 dark:text-gray-300">等待播放</span>
+              <span id="status-name" class="font-medium">...</span>
+            </div>
+            <div id="current-url" class="text-xs text-gray-500 dark:text-gray-400 truncate max-w-md"></div>
+          </div>
+
+          <!-- 播放历史 -->
+          <div class="mt-8">
+            <div class="flex justify-between items-center mb-4 flex-wrap gap-3">
+              <h2 class="text-2xl font-semibold flex items-center gap-2">
+                <i class="fas fa-history text-primary"></i>
+                <span>播放历史</span>
+              </h2>
+              
+              <button id="clear-history-btn" 
+                      class="flex items-center gap-2 px-4 py-2 bg-danger hover:bg-red-600 text-white text-sm font-medium rounded-lg transition-colors">
+                <i class="fas fa-trash-alt"></i>
+                <span>清空历史</span>
+              </button>
+            </div>
+            
+            <ul id="history-list" class="space-y-2"></ul>
+          </div>
+
+        </div>
+      </div>
+    </main>
+
+  </div>
+
+  <script>
+    let currentHls = null;
+
+    //region 频道列表数据
+    const channelList = [
+      { name: "BBC世界(欧洲)", url: "https://viamotionhsi.netplus.ch/live/eds/bbcworld/browser-HLS8/bbcworld.m3u8" },
+      { name: "美国广播公司-新闻(ABC)", url: "https://livetv-fa.tubi.video/abc-news/index.m3u8" },
+      { name: "美国福克斯(FOX)", url: "https://fl1.moveonjoy.com/FOX/index.m3u8" },
+      { name: "美国福克斯news(FOX)", url: "https://fl1.moveonjoy.com/FOX_NEWS_CHANNEL/index.m3u8" },
+      { name: "BBC新闻(北美)", url: "https://fl1.moveonjoy.com/BBC_WORLD_NEWS/index.m3u8" },
+      { name: "BBC新闻", url: "https://cdn4.skygo.mn/live/disk1/BBC_News/HLSv3-FTA/BBC_News.m3u8" },
+      { name: "中国国际CGTN", url: "https://amg00405-rakutentv-cgtn-rakuten-i9tar.amagi.tv/master.m3u8" },
+      { name: "美国广播公司(ABC)", url: "http://41.205.93.154/ABC/index.m3u8" },
+      { name: "美国消费者新闻与商业频道(CNBC)", url: "https://fl1.moveonjoy.com/CNBC/index.m3u8" },
+      { name: "(CNBC-world)", url: "https://fl1.moveonjoy.com/CNBC_World/index.m3u8" },
+      { name: "安顺新闻频道", url: "https://hplayer1.juyun.tv/camera/154379194.m3u8" },
+      { name: "cctv+", url: "https://cd-live-stream.news.cctvplus.com/live/smil:CHANNEL1.smil/playlist.m3u8" },
+      { name: "CBS News Los Angeles", url: "https://cbsn-la.cbsnstream.cbsnews.com/out/v1/57b6c4534a164accb6b1872b501e0028/master.m3u8" }
+    ];
+
+    // 根据URL查找频道名称
+    function findNameByUrl(url) {
+      const channel = channelList.find(ch => ch.url === url);
+      return channel ? channel.name : "...";
+    }
+
+    // 自定义提示框
+    function showAlert(message, duration = 3000) {
+      const $alert = $(`
+        <div class="fixed top-20 left-1/2 transform -translate-x-1/2 px-6 py-4 bg-gray-800 text-white rounded-lg shadow-2xl z-50 cursor-pointer transition-opacity duration-300 max-w-md">
+          <div class="flex items-center gap-3">
+            <i class="fas fa-info-circle text-primary"></i>
+            <span>${message}</span>
+          </div>
+        </div>
+      `);
+
+      $('body').append($alert);
+
+      const closeAlert = () => {
+        $alert.css('opacity', '0');
+        setTimeout(() => $alert.remove(), 300);
+      };
+
+      const timer = setTimeout(closeAlert, duration);
+      $alert.on('click', () => {
+        clearTimeout(timer);
+        closeAlert();
+      });
+    }
+
+    $(function() {
+      const $videoPlayer = $('#video-player');
+      const $m3u8Input = $('#m3u8-url');
+
+      // 初始化频道列表
+      function initChannels() {
+        const $channelList = $('#channel-list').empty();
+        
+        channelList.forEach(channel => {
+          const $item = $(`
+            <li class="flex items-center gap-3 p-3 bg-white dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:border-primary hover:translate-x-1 transition-all">
+              <i class="fas fa-satellite-dish text-primary text-lg"></i>
+              <span class="font-medium text-sm">${channel.name}</span>
+            </li>
+          `);
+          
+          $item.on('click', () => {
+            $m3u8Input.val(channel.url);
+            playStream(channel.url);
+            // 移动端自动关闭侧边栏
+            if (window.innerWidth < 1024) {
+              $('#sidebar').removeClass('translate-x-0').addClass('-translate-x-full');
+              $('#sidebar-overlay').removeClass('opacity-100').addClass('opacity-0');
+              setTimeout(() => $('#sidebar-overlay').hide(), 300);
+            }
+          });
+          
+          $channelList.append($item);
+        });
+      }
+
+      // 主题管理
+      function loadTheme() {
+        const savedTheme = localStorage.getItem('themePreference') || 'dark';
+        setTheme(savedTheme);
+      }
+
+      function toggleTheme() {
+        const isDark = $('html').hasClass('dark');
+        setTheme(isDark ? 'light' : 'dark');
+      }
+
+      function setTheme(theme) {
+        if (theme === 'dark') {
+          $('html').addClass('dark');
+          $('#theme-icon').removeClass('fa-moon').addClass('fa-sun');
+        } else {
+          $('html').removeClass('dark');
+          $('#theme-icon').removeClass('fa-sun').addClass('fa-moon');
+        }
+        localStorage.setItem('themePreference', theme);
+      }
+
+      // 历史记录管理
+      function loadHistory() {
+        const history = JSON.parse(localStorage.getItem('playHistory')) || [];
+        const $historyList = $('#history-list').empty();
+
+        if (history.length === 0) {
+          $historyList.html(`
+            <div class="text-center py-12 text-gray-500 dark:text-gray-400">
+              <i class="fas fa-inbox text-5xl mb-3 opacity-50"></i>
+              <div class="text-lg">暂无播放记录</div>
+            </div>
+          `);
+          return;
+        }
+
+        history.forEach((url, index) => {
+          const $li = $(`
+            <li class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 bg-gray-50 dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:border-primary hover:translate-x-1 transition-all">
+              <span class="text-sm text-gray-600 dark:text-gray-300 truncate flex-1" title="${url}">${url}</span>
+              <button class="history-delete flex items-center gap-2 px-3 py-1.5 bg-transparent text-danger hover:bg-danger hover:text-white text-xs font-medium rounded transition-colors">
+                <i class="fas fa-trash-alt"></i>
+                <span>删除</span>
+              </button>
+            </li>
+          `);
+
+          $li.on('click', (e) => {
+            if ($(e.target).closest('.history-delete').length) return;
+            playStream(url);
+          });
+
+          $li.find('.history-delete').on('click', (e) => {
+            e.stopPropagation();
+            deleteHistoryItem(index);
+          });
+
+          $historyList.append($li);
+        });
+      }
+
+      function updateHistory(url) {
+        let history = JSON.parse(localStorage.getItem('playHistory')) || [];
+        history = history.filter(item => item !== url);
+        history.unshift(url);
+        
+        if (history.length > 10) history.pop();
+
+        localStorage.setItem('playHistory', JSON.stringify(history));
+        loadHistory();
+      }
+
+      function deleteHistoryItem(index) {
+        const history = JSON.parse(localStorage.getItem('playHistory')) || [];
+        history.splice(index, 1);
+        localStorage.setItem('playHistory', JSON.stringify(history));
+        loadHistory();
+      }
+
+      function clearHistory() {
+        if (confirm('确定要清空所有播放历史吗？')) {
+          localStorage.removeItem('playHistory');
+          loadHistory();
+        }
+      }
+
+      // 播放器状态更新
+      function updateStatus(status, isActive = false) {
+        $('#status-text').text(status);
+        if (isActive) {
+          $('#status-dot').removeClass('bg-gray-400').addClass('bg-success animate-pulse-dot');
+        } else {
+          $('#status-dot').removeClass('bg-success animate-pulse-dot').addClass('bg-gray-400');
+        }
+      }
+
+      // 核心播放逻辑
+      function playStream(url = null) {
+        const videoUrl = url || $m3u8Input.val().trim();
+        const videoEl = $videoPlayer[0];
+
+        if (!videoUrl) {
+          showAlert("请输入视频链接！");
+          return;
+        }
+
+        if (currentHls) {
+          currentHls.destroy();
+          currentHls = null;
+        }
+
+        updateStatus('正在加载...', false);
+        $('#current-url').text(videoUrl);
+        $('#status-name').text(findNameByUrl(videoUrl));
+
+        if (Hls.isSupported()) {
+          currentHls = new Hls();
+          currentHls.loadSource(videoUrl);
+          currentHls.attachMedia(videoEl);
+
+          currentHls.on(Hls.Events.MANIFEST_PARSED, () => {
+            console.log('流媒体加载成功！');
+            updateStatus('播放中', true);
+            videoEl.play().catch(e => console.warn("自动播放被阻止:", e));
+          });
+
+          currentHls.on(Hls.Events.ERROR, (event, data) => {
+            console.error('HLS Error:', data);
+            if (data.fatal) {
+              updateStatus('加载失败', false);
+              showAlert('加载流媒体时发生错误，请检查链接或网络连接。');
+            }
+          });
+        } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+          videoEl.src = videoUrl;
+          videoEl.addEventListener('loadedmetadata', () => {
+            updateStatus('播放中', true);
+            videoEl.play();
+          });
+          videoEl.addEventListener('error', () => updateStatus('加载失败', false));
+        } else {
+          updateStatus('不支持', false);
+          showAlert("您的浏览器不支持播放该流媒体！");
+          return;
+        }
+
+        updateHistory(videoUrl);
+      }
+
+      // 初始化
+      loadTheme();
+      loadHistory();
+      initChannels();
+
+      // 事件绑定
+      $('#theme-toggle').on('click', toggleTheme);
+      $('#play-btn').on('click', () => playStream());
+      $('#clear-btn').on('click', () => $m3u8Input.val('').focus());
+      $('#clear-history-btn').on('click', clearHistory);
+
+      $m3u8Input.on('keypress', (e) => {
+        if (e.which === 13) playStream();
+      });
+
+      $videoPlayer
+        .on('play', () => updateStatus('播放中', true))
+        .on('pause', () => updateStatus('已暂停', false))
+        .on('ended', () => updateStatus('播放完成', false));
+
+      // 侧边栏/汉堡菜单
+      $('#menu-toggle').on('click', () => {
+        $('#sidebar').removeClass('-translate-x-full').addClass('translate-x-0');
+        $('#sidebar-overlay').show().removeClass('opacity-0').addClass('opacity-100');
+      });
+
+      $('#sidebar-overlay').on('click', () => {
+        $('#sidebar').removeClass('translate-x-0').addClass('-translate-x-full');
+        $('#sidebar-overlay').removeClass('opacity-100').addClass('opacity-0');
+        setTimeout(() => $('#sidebar-overlay').hide(), 300);
+      });
+    });
+  </script>
+</body>
+</html>
