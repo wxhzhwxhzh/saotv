@@ -26,19 +26,6 @@
     .animate-pulse-dot {
       animation: pulse 2s infinite;
     }
-    /* 确保视频播放器在小屏上有良好的比例 */
-    .video-container {
-        position: relative;
-        width: 100%;
-        padding-top: 56.25%; /* 16:9 Aspect Ratio */
-    }
-    .video-container video {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-    }
   </style>
   
   <script>
@@ -133,12 +120,6 @@
                 <span>播放</span>
               </button>
               
-              <button id="copy-url-btn" 
-                      class="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-lg hover:-translate-y-0.5 hover:shadow-lg transition-all">
-                <i class="fas fa-copy"></i>
-                <span>复制链接</span>
-              </button>
-
               <button id="clear-btn" 
                       class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-danger hover:bg-red-600 text-white font-semibold rounded-lg hover:-translate-y-0.5 hover:shadow-lg transition-all">
                 <i class="fas fa-trash"></i>
@@ -148,11 +129,12 @@
           </div>
 
           <!-- 视频播放器 -->
-          <div class="rounded-xl overflow-hidden bg-black mb-4 video-container">
+          <div class="rounded-xl overflow-hidden bg-black mb-4">
             <video id="video-player" 
                    controls 
                    poster="https://placehold.co/1280x720/1a1a2e/ffffff?text=SaoShen+TV+Player"
-                   class="w-full h-full">
+                   class="w-full h-auto">
+              <source id="video-source" type="application/x-mpegURL">
               您的浏览器不支持视频播放。
             </video>
           </div>
@@ -172,7 +154,7 @@
             <div class="flex justify-between items-center mb-4 flex-wrap gap-3">
               <h2 class="text-2xl font-semibold flex items-center gap-2">
                 <i class="fas fa-history text-primary"></i>
-                <span>播放历史 (最大容量: 10)</span>
+                <span>播放历史</span>
               </h2>
               
               <button id="clear-history-btn" 
@@ -214,7 +196,7 @@
     // 根据URL查找频道名称
     function findNameByUrl(url) {
       const channel = channelList.find(ch => ch.url === url);
-      return channel ? channel.name : "..."; // 返回 "..." 表示未找到匹配的预设名称
+      return channel ? channel.name : "...";
     }
 
     // 自定义提示框
@@ -242,26 +224,9 @@
       });
     }
 
-    // 复制 URL 到剪贴板
-    function copyUrlToClipboard(url) {
-      if (!url) {
-        showAlert("没有链接可以复制。");
-        return;
-      }
-      // 使用 document.execCommand('copy') 确保在 iFrame 环境中可用
-      const tempInput = document.createElement('textarea');
-      tempInput.value = url;
-      document.body.appendChild(tempInput);
-      tempInput.select();
-      document.execCommand('copy');
-      document.body.removeChild(tempInput);
-      showAlert(`链接已复制到剪贴板。`);
-    }
-
     $(function() {
       const $videoPlayer = $('#video-player');
       const $m3u8Input = $('#m3u8-url');
-      const MAX_HISTORY_SIZE = 10; // 最大历史记录容量
 
       // 初始化频道列表
       function initChannels() {
@@ -313,27 +278,8 @@
       }
 
       // 历史记录管理
-      
-      // 读取历史记录，兼容旧格式（字符串数组）
-      function getHistory() {
-          let history = [];
-          try {
-              history = JSON.parse(localStorage.getItem('playHistory')) || [];
-              // 如果发现是旧的字符串数组格式，尝试转换成新的对象格式
-              if (history.length > 0 && typeof history[0] === 'string') {
-                  history = history.map(url => ({ url: url, name: findNameByUrl(url) }));
-                  // 转换后写回，确保下次加载是新格式
-                  localStorage.setItem('playHistory', JSON.stringify(history));
-              }
-          } catch (e) {
-              console.error("历史记录加载失败或格式错误，重置历史记录。", e);
-              history = []; // 错误时重置
-          }
-          return history;
-      }
-
       function loadHistory() {
-        const history = getHistory();
+        const history = JSON.parse(localStorage.getItem('playHistory')) || [];
         const $historyList = $('#history-list').empty();
 
         if (history.length === 0) {
@@ -346,60 +292,25 @@
           return;
         }
 
-        history.forEach((item, index) => {
-          const displayUrl = item.url;
-          const displayName = item.name;
-          
-          let displayContent;
-          
-          // 优先显示名称，如果名称不为空且不是默认的 "..."
-          if (displayName && displayName !== '...') {
-            displayContent = `<i class="fas fa-satellite-dish text-primary mr-3"></i> <span class="text-base font-semibold">${displayName}</span>`;
-          } else {
-            // 否则显示 URL，并进行美观截断
-            const shortenedUrl = displayUrl.length > 60 ? displayUrl.substring(0, 57) + '...' : displayUrl;
-            displayContent = `<i class="fas fa-link text-gray-400 mr-3"></i> <span class="text-sm font-normal">${shortenedUrl}</span>`;
-          }
-
+        history.forEach((url, index) => {
           const $li = $(`
             <li class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 bg-gray-50 dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:border-primary hover:translate-x-1 transition-all">
-              <!-- 主要显示内容 (名称或截断的 URL) -->
-              <span class="text-sm text-gray-600 dark:text-gray-300 truncate flex-1" 
-                    title="${displayUrl}" data-full-url="${displayUrl}">
-                ${displayContent}
-              </span>
-              
-              <!-- 操作按钮 -->
-              <div class="flex gap-2 items-center text-nowrap">
-                <button class="history-show-url flex items-center gap-1 px-3 py-1.5 bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-100 hover:bg-gray-400 dark:hover:bg-gray-500 text-xs font-medium rounded transition-colors">
-                    <i class="fas fa-globe text-xs"></i>
-                    <span>URL</span>
-                </button>
-                <button class="history-delete flex items-center gap-1 px-3 py-1.5 bg-transparent text-danger hover:bg-danger hover:text-white text-xs font-medium rounded transition-colors border border-danger hover:border-transparent">
-                  <i class="fas fa-trash-alt text-xs"></i>
-                  <span>删除</span>
-                </button>
-              </div>
+              <span class="text-sm text-gray-600 dark:text-gray-300 truncate flex-1" title="${url}">${url}</span>
+              <button class="history-delete flex items-center gap-2 px-3 py-1.5 bg-transparent text-danger hover:bg-danger hover:text-white text-xs font-medium rounded transition-colors">
+                <i class="fas fa-trash-alt"></i>
+                <span>删除</span>
+              </button>
             </li>
           `);
 
-          // 播放事件
           $li.on('click', (e) => {
-            // 避免点击按钮时触发播放
-            if ($(e.target).closest('.history-delete, .history-show-url').length) return;
-            playStream(item.url);
-          });
-          
-          // 删除按钮事件 (通过 URL 删除)
-          $li.find('.history-delete').on('click', (e) => {
-            e.stopPropagation();
-            deleteHistoryItem(item.url); 
+            if ($(e.target).closest('.history-delete').length) return;
+            playStream(url);
           });
 
-          // 显示 URL 按钮事件
-          $li.find('.history-show-url').on('click', (e) => {
+          $li.find('.history-delete').on('click', (e) => {
             e.stopPropagation();
-            showAlert(`完整链接: ${displayUrl}`);
+            deleteHistoryItem(index);
           });
 
           $historyList.append($li);
@@ -407,39 +318,28 @@
       }
 
       function updateHistory(url) {
-        // 新增历史记录项的结构：{ url: string, name: string }
-        const name = findNameByUrl(url); 
-        const newItem = { url: url, name: name };
-
-        let history = getHistory(); // 使用 getHistory() 确保获取的是新格式
+        let history = JSON.parse(localStorage.getItem('playHistory')) || [];
+        history = history.filter(item => item !== url);
+        history.unshift(url);
         
-        // 过滤掉已存在的相同 URL 的记录
-        history = history.filter(item => item.url !== url);
-        
-        // 将新项添加到最前面
-        history.unshift(newItem);
-        
-        // 确保不超过最大容量
-        if (history.length > MAX_HISTORY_SIZE) history.pop();
+        if (history.length > 10) history.pop();
 
         localStorage.setItem('playHistory', JSON.stringify(history));
         loadHistory();
       }
 
-      function deleteHistoryItem(urlToDelete) {
-        let history = getHistory(); // 使用 getHistory() 确保获取的是新格式
-        
-        history = history.filter(item => item.url !== urlToDelete);
-        
+      function deleteHistoryItem(index) {
+        const history = JSON.parse(localStorage.getItem('playHistory')) || [];
+        history.splice(index, 1);
         localStorage.setItem('playHistory', JSON.stringify(history));
         loadHistory();
       }
 
       function clearHistory() {
-        // 自定义确认弹窗
-        showAlert('正在清空所有历史记录...', 1500);
-        localStorage.removeItem('playHistory');
-        loadHistory();
+        if (confirm('确定要清空所有播放历史吗？')) {
+          localStorage.removeItem('playHistory');
+          loadHistory();
+        }
       }
 
       // 播放器状态更新
@@ -461,9 +361,6 @@
           showAlert("请输入视频链接！");
           return;
         }
-        
-        // 更新输入框的值
-        $m3u8Input.val(videoUrl);
 
         if (currentHls) {
           currentHls.destroy();
@@ -490,32 +387,19 @@
             if (data.fatal) {
               updateStatus('加载失败', false);
               showAlert('加载流媒体时发生错误，请检查链接或网络连接。');
-              // 尝试直接作为原生视频源播放，以支持MP4等非HLS链接
-              videoEl.src = videoUrl;
-              videoEl.load();
-              videoEl.play().catch(e => console.warn("原生播放尝试失败:", e));
             }
           });
         } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
           videoEl.src = videoUrl;
-          videoEl.load();
           videoEl.addEventListener('loadedmetadata', () => {
             updateStatus('播放中', true);
             videoEl.play();
-          }, { once: true });
-          videoEl.addEventListener('error', () => updateStatus('加载失败', false), { once: true });
+          });
+          videoEl.addEventListener('error', () => updateStatus('加载失败', false));
         } else {
-          // 尝试直接作为原生视频源播放
-          videoEl.src = videoUrl;
-          videoEl.load();
-          videoEl.addEventListener('loadedmetadata', () => {
-            updateStatus('播放中', true);
-            videoEl.play();
-          }, { once: true });
-          videoEl.addEventListener('error', () => {
-            updateStatus('加载失败', false);
-            showAlert("您的浏览器不支持播放该流媒体或链接无效！");
-          }, { once: true });
+          updateStatus('不支持', false);
+          showAlert("您的浏览器不支持播放该流媒体！");
+          return;
         }
 
         updateHistory(videoUrl);
@@ -529,12 +413,8 @@
       // 事件绑定
       $('#theme-toggle').on('click', toggleTheme);
       $('#play-btn').on('click', () => playStream());
-      $('#copy-url-btn').on('click', () => copyUrlToClipboard($m3u8Input.val().trim()));
       $('#clear-btn').on('click', () => $m3u8Input.val('').focus());
-      $('#clear-history-btn').on('click', () => {
-          showAlert('确定要清空所有播放历史吗？', 10000); // 10秒提示，模拟确认
-          setTimeout(() => clearHistory(), 1500); // 1.5秒后执行清空，给用户反应时间
-      });
+      $('#clear-history-btn').on('click', clearHistory);
 
       $m3u8Input.on('keypress', (e) => {
         if (e.which === 13) playStream();
